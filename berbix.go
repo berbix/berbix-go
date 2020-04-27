@@ -2,14 +2,24 @@ package berbix
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
-const SDKVersion = "0.0.1"
+const (
+	sdkVersion = "0.0.1"
+	clockDrift = 300
+)
 
 type Client interface {
 	CreateTransaction(options *CreateTransactionOptions) (*Tokens, error)
@@ -18,6 +28,7 @@ type Client interface {
 	DeleteTransaction(tokens *Tokens) error
 	UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error)
 	OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error
+	ValidateSignature(secret, body, header string) error
 }
 
 type defaultClient struct {
@@ -76,6 +87,32 @@ func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTra
 	return c.tokenAuthRequest(http.MethodPatch, tokens, "/v0/transactions/override", options, nil)
 }
 
+func computeHMACSHA256(secret, message string) string {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(message))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (c *defaultClient) ValidateSignature(secret, body, header string) error {
+	parts := strings.Split(header, ",")
+	if len(parts) != 3 {
+		return errors.New("incorrect number of parts in header for validation")
+	}
+	timestamp, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return err
+	}
+	signature := parts[2]
+	if timestamp < time.Now().Unix() - clockDrift {
+		return errors.New("hook is outside of drift range, signature invalid")
+	}
+	toSign := fmt.Sprintf("%d,%s,%s", timestamp, secret, body)
+	if signature != computeHMACSHA256(secret, toSign) {
+		return errors.New("signature does not match")
+	}
+	return nil
+}
+
 func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path string, payload interface{}, dst interface{}) error {
 	var err error
 	if tokens.NeedsRefresh() {
@@ -94,7 +131,7 @@ func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path str
 	}
 	headers := map[string]string{
 		"Content-Type": "application/json",
-		"User-Agent": fmt.Sprintf("BerbixGo/%s", SDKVersion),
+		"User-Agent": fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": fmt.Sprintf("Bearer %s", tokens.AccessToken),
 	}
 	return c.client.Request(method, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
@@ -111,7 +148,7 @@ func (c *defaultClient) fetchTokens(path string, payload interface{}) (*Tokens, 
 	}
 	headers := map[string]string{
 		"Content-Type": "application/json",
-		"User-Agent": fmt.Sprintf("BerbixGo/%s", SDKVersion),
+		"User-Agent": fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": c.basicAuth(),
 	}
 	response := &tokenResponse{}
