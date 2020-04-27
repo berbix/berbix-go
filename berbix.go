@@ -32,10 +32,14 @@ type ClientOptions struct {
 }
 
 func NewClient(secret string, options *ClientOptions) Client {
+	client := options.HTTPClient
+	if client == nil {
+		client = &DefaultHTTPClient{client: http.DefaultClient}
+	}
 	return &defaultClient{
 		secret: secret,
 		host:   options.Host,
-		client: options.HTTPClient,
+		client: client,
 	}
 }
 
@@ -97,20 +101,27 @@ func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path str
 }
 
 func (c *defaultClient) fetchTokens(path string, payload interface{}) (*Tokens, error) {
+	var body io.Reader
+	if payload != nil {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		body = bytes.NewReader(data)
+	}
 	headers := map[string]string{
 		"Content-Type": "application/json",
 		"User-Agent": fmt.Sprintf("BerbixGo/%s", SDKVersion),
 		"Authorization": c.basicAuth(),
 	}
 	response := &tokenResponse{}
-	if err := c.client.Request(http.MethodPost, c.makeURL(path), headers, &RequestOptions{}, response); err != nil {
+	if err := c.client.Request(http.MethodPost, c.makeURL(path), headers, &RequestOptions{Body: body}, response); err != nil {
 		return nil, err
 	}
 	return fromTokenResponse(response), nil
 }
 
 func (c *defaultClient) makeURL(path string) string {
-	http.Request{}.BasicAuth()
 	return fmt.Sprintf("%s%s", c.host, path)
 }
 

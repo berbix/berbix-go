@@ -17,7 +17,7 @@ type HTTPClient interface {
 }
 
 type DefaultHTTPClient struct {
-	client http.Client
+	client *http.Client
 }
 
 func (d *DefaultHTTPClient) Request(method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) (err error) {
@@ -44,7 +44,7 @@ func (d *DefaultHTTPClient) Request(method string, url string, headers map[strin
 
 	if res.StatusCode != http.StatusNoContent {
 		if dst != nil {
-			if err := json.NewDecoder(res.Body).Decode(dst); err != nil {
+			if err = json.NewDecoder(res.Body).Decode(dst); err != nil {
 				return
 			}
 		} else {
