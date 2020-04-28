@@ -68,3 +68,13 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+
+func TestDefaultClient_ValidateSignature(t *testing.T) {
+	client := NewClient("", &ClientOptions{})
+
+	err := client.ValidateSignature("whs_live_qawRQRZg0TvWJ3fytpR26U2rMkClZQ1K", "{\"user_id\":1234123412341234,\"transaction_id\":1234123412341234,\"code\":\"1234123412341234\",\"customer_uid\":\"unique-uid\",\"action\":\"test-action\",\"dashboard_link\":\"https://docs.berbix.com\"}\n", "v0,1588001033,5ddbe8b2a0fc2d5a7fd173ed9e442fc9b670add2578c06d3f2f9330a567fa434")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
