@@ -47,9 +47,13 @@ func NewClient(secret string, options *ClientOptions) Client {
 	if client == nil {
 		client = &DefaultHTTPClient{client: http.DefaultClient}
 	}
+	host := options.Host
+	if host == "" {
+		host = "https://api.berbix.com"
+	}
 	return &defaultClient{
 		secret: secret,
-		host:   options.Host,
+		host:   host,
 		client: client,
 	}
 }
