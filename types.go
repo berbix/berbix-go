@@ -7,18 +7,19 @@ import (
 type CreateTransactionOptions struct {
 	CustomerUID string `json:"customer_uid"`
 	TemplateKey string `json:"template_key"`
-	Email string `json:"email"`
-	Phone string `json:"phone"`
+	Email       string `json:"email"`
+	Phone       string `json:"phone"`
 }
 
 type UpdateTransactionOptions struct {
 	Action string `json:"action"`
-	Note string `json:"note"`
+	Note   string `json:"note"`
 }
 
 type OverrideTransactionOptions struct {
-	ResponsePayload string `json:"response_payload"`
-	Flags []string `json:"flags"`
+	ResponsePayload string            `json:"response_payload"`
+	Flags           []string          `json:"flags"`
+	OverrideFields  map[string]string `json:"override_fields"`
 }
 
 type DuplicateInfo struct {

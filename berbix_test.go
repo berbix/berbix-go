@@ -29,6 +29,9 @@ func TestClient(t *testing.T) {
 		Flags:           []string{
 			"id_under_21",
 		},
+		OverrideFields: map[string]string{
+			"date_of_birth": "2000-12-09",
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -49,6 +52,10 @@ func TestClient(t *testing.T) {
 
 	if resultsA.Flags[0] != "id_under_21" {
 		t.Errorf("expected id_under_21 flag")
+	}
+
+	if resultsA.Fields == nil || resultsA.Fields.DateOfBirth == nil || resultsA.Fields.DateOfBirth.Value != "2000-12-09" {
+		t.Errorf("expected DateOfBirth to be 2000-12-09")
 	}
 
 	t.Log(resultsA)
