@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	sdkVersion = "0.0.1"
+	sdkVersion = "0.0.2"
 	clockDrift = 300
 )
 
@@ -33,12 +33,12 @@ type Client interface {
 
 type defaultClient struct {
 	secret string
-	host string
+	host   string
 	client HTTPClient
 }
 
 type ClientOptions struct {
-	Host string
+	Host       string
 	HTTPClient HTTPClient
 }
 
@@ -65,10 +65,10 @@ func (c *defaultClient) CreateTransaction(options *CreateTransactionOptions) (*T
 func (c *defaultClient) RefreshTokens(tokens *Tokens) (*Tokens, error) {
 	payload := &struct {
 		RefreshToken string `json:"refresh_token"`
-		GrantType string `json:"grant_type"`
+		GrantType    string `json:"grant_type"`
 	}{
 		RefreshToken: tokens.RefreshToken,
-		GrantType: "refresh_token",
+		GrantType:    "refresh_token",
 	}
 	return c.fetchTokens("/v0/tokens", payload)
 }
@@ -107,7 +107,7 @@ func (c *defaultClient) ValidateSignature(secret, body, header string) error {
 		return err
 	}
 	signature := parts[2]
-	if timestamp < time.Now().Unix() - clockDrift {
+	if timestamp < time.Now().Unix()-clockDrift {
 		return errors.New("hook is outside of drift range, signature invalid")
 	}
 	toSign := fmt.Sprintf("%d,%s,%s", timestamp, secret, body)
@@ -134,8 +134,8 @@ func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path str
 		body = bytes.NewReader(data)
 	}
 	headers := map[string]string{
-		"Content-Type": "application/json",
-		"User-Agent": fmt.Sprintf("BerbixGo/%s", sdkVersion),
+		"Content-Type":  "application/json",
+		"User-Agent":    fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": fmt.Sprintf("Bearer %s", tokens.AccessToken),
 	}
 	return c.client.Request(method, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
@@ -151,8 +151,8 @@ func (c *defaultClient) fetchTokens(path string, payload interface{}) (*Tokens, 
 		body = bytes.NewReader(data)
 	}
 	headers := map[string]string{
-		"Content-Type": "application/json",
-		"User-Agent": fmt.Sprintf("BerbixGo/%s", sdkVersion),
+		"Content-Type":  "application/json",
+		"User-Agent":    fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": c.basicAuth(),
 	}
 	response := &tokenResponse{}

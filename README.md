@@ -11,7 +11,7 @@ This Berbix Go library provides simple interfaces to interact with the Berbix AP
 ### Constructing a client
 
     import "github.com/berbix/berbix-go"
-    
+
     client := NewClient(secret, &ClientOptions{})
 
 ### Create a transaction
@@ -34,7 +34,7 @@ This Berbix Go library provides simple interfaces to interact with the Berbix AP
 
 ### `Client`
 
-##### NewClient(secret string, options *ClientOptions) Client
+##### NewClient(secret string, options \*ClientOptions) Client
 
 Supported options:
 
@@ -95,6 +95,7 @@ Parameters:
 
 - `ResponsePayload: string` - A string describing the payload type to return when fetching transaction metadata, e.g. "us-dl". See [our testing guide](https://docs.berbix.com/docs/testing) for possible options.
 - `Flags: []string` - An optional list of flags to associate with the transaction (independent of the payload's contents), e.g. ["id_under_18", "id_under_21"]. See [our flags documentation](https://docs.berbix.com/docs/id-flags) for a list of flags.
+- `OverrideFields: map[string]string` - An optional mapping from a [transaction field](https://docs.berbix.com/reference#gettransactionmetadata) to the desired override value, e.g. `OverrideFields = map[string]string{"date_of_birth" : "2000-12-09",}`
 
 ### `Tokens`
 
