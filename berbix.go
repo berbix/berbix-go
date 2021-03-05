@@ -17,12 +17,14 @@ import (
 )
 
 const (
-	sdkVersion = "0.0.2"
-	clockDrift = 300
+	sdkVersion     = "1.0.0"
+	clockDrift     = 300
+	v0Transactions = "/v0/transactions"
 )
 
 type Client interface {
 	CreateTransaction(options *CreateTransactionOptions) (*Tokens, error)
+	CreateHostedTransaction(options *CreateHostedTransactionOptions) (*CreateHostedTransactionResponse, error)
 	RefreshTokens(tokens *Tokens) (*Tokens, error)
 	FetchTransaction(tokens *Tokens) (*TransactionMetadata, error)
 	DeleteTransaction(tokens *Tokens) error
@@ -59,10 +61,32 @@ func NewClient(secret string, options *ClientOptions) Client {
 }
 
 func (c *defaultClient) CreateTransaction(options *CreateTransactionOptions) (*Tokens, error) {
-	return c.fetchTokens("/v0/transactions", options)
+	if options == nil {
+		return nil, errors.New("options cannot be nil")
+	}
+	return c.fetchTokens(v0Transactions, options)
+}
+
+func (c *defaultClient) CreateHostedTransaction(options *CreateHostedTransactionOptions) (*CreateHostedTransactionResponse, error) {
+	if options == nil {
+		return nil, errors.New("options cannot be nil")
+	}
+	response := &hostedTransactionResponse{}
+	if err := c.postBasicAuth(v0Transactions, options, response); err != nil {
+		return nil, err
+	}
+
+	tokens := fromTokenResponse(&response.tokenResponse)
+	return &CreateHostedTransactionResponse{
+		Tokens:    *tokens,
+		HostedURL: response.HostedURL,
+	}, nil
 }
 
 func (c *defaultClient) RefreshTokens(tokens *Tokens) (*Tokens, error) {
+	if tokens == nil {
+		return nil, errors.New("tokens cannot be nil")
+	}
 	payload := &struct {
 		RefreshToken string `json:"refresh_token"`
 		GrantType    string `json:"grant_type"`
@@ -74,17 +98,31 @@ func (c *defaultClient) RefreshTokens(tokens *Tokens) (*Tokens, error) {
 }
 
 func (c *defaultClient) FetchTransaction(tokens *Tokens) (*TransactionMetadata, error) {
+	if tokens == nil {
+		return nil, errors.New("tokens cannot be nil")
+	}
 	metadata := &TransactionMetadata{}
-	return metadata, c.tokenAuthRequest(http.MethodGet, tokens, "/v0/transactions", nil, metadata)
+	return metadata, c.tokenAuthRequest(http.MethodGet, tokens, v0Transactions, nil, metadata)
 }
 
 func (c *defaultClient) DeleteTransaction(tokens *Tokens) error {
-	return c.tokenAuthRequest(http.MethodDelete, tokens, "/v0/transactions", nil, nil)
+	if tokens == nil {
+		return errors.New("tokens cannot be nil")
+	}
+	return c.tokenAuthRequest(http.MethodDelete, tokens, v0Transactions, nil, nil)
 }
 
 func (c *defaultClient) UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error) {
+	if tokens == nil {
+		return nil, errors.New("tokens cannot be nil")
+	}
+
+	if options == nil {
+		return nil, errors.New("options cannot be nil")
+	}
+
 	metadata := &TransactionMetadata{}
-	return metadata, c.tokenAuthRequest(http.MethodPatch, tokens, "/v0/transactions", options, metadata)
+	return metadata, c.tokenAuthRequest(http.MethodPatch, tokens, v0Transactions, options, metadata)
 }
 
 func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error {
@@ -142,11 +180,20 @@ func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path str
 }
 
 func (c *defaultClient) fetchTokens(path string, payload interface{}) (*Tokens, error) {
+	response := &tokenResponse{}
+	if err := c.postBasicAuth(path, payload, response); err != nil {
+		return nil, err
+	}
+
+	return fromTokenResponse(response), nil
+}
+
+func (c *defaultClient) postBasicAuth(path string, payload interface{}, dst interface{}) error {
 	var body io.Reader
 	if payload != nil {
 		data, err := json.Marshal(payload)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		body = bytes.NewReader(data)
 	}
@@ -155,11 +202,7 @@ func (c *defaultClient) fetchTokens(path string, payload interface{}) (*Tokens, 
 		"User-Agent":    fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": c.basicAuth(),
 	}
-	response := &tokenResponse{}
-	if err := c.client.Request(http.MethodPost, c.makeURL(path), headers, &RequestOptions{Body: body}, response); err != nil {
-		return nil, err
-	}
-	return fromTokenResponse(response), nil
+	return c.client.Request(http.MethodPost, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
 }
 
 func (c *defaultClient) makeURL(path string) string {

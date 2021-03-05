@@ -21,6 +21,25 @@ This Berbix Go library provides simple interfaces to interact with the Berbix AP
         TemplateKey: "your_template_key", # Template key for this transaction,
     })
 
+Or, if you need the hosted URL
+
+	options := &CreateHostedTransactionOptions{
+		CreateTransactionOptions: CreateTransactionOptions{
+			CustomerUID: "internal_customer_uid",
+			TemplateKey: "your_template_key",
+		},
+		HostedOptions: HostedOptions{
+			// Optional
+			CompletionEmail: "example@example.com",
+		},
+	}
+	resp, err := client.CreateHostedTransaction(options)
+	if err != nil {
+		// Handle error
+	}
+
+	hostedURL := resp.HostedURL
+
 ### Create tokens from refresh token
 
     refreshToken := "" # fetched from database
@@ -51,9 +70,22 @@ currently active user session.
 Supported options:
 
 - `Email` - Previously verified email address for a user.
+  
 - `Phone` - Previously verified phone number for a user.
+  
 - `CustomerUID` - An ID or identifier for the user in your system.
+  
 - `TemplateKey` - The template key for this transaction.
+
+##### `CreateHostedTransaction(options *CreateHostedTransactionOptions) (*CreateHostedTransactionResponse, error)`
+
+Behaves the same as `CreateTransaction()` with two key differences: it returns a URL for a hosted transaction
+in addition to tokens and supports two optional parameters in addition to those supported for
+`CreateTransaction()`:
+
+- `CompletionEmail` - Where to send an email when the verification completes.
+  
+- `RedirectURL` - URL to redirect the user to after they complete the transaction. If not specified, the URL specified in the Berbix dashboard will be used instead.
 
 ##### `FetchTransaction(tokens *Tokens) (*TransactionMetadata, error)`
 
