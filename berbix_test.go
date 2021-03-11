@@ -7,7 +7,7 @@ import (
 
 const customerUID = "some_cool_customer_uid"
 
-func TestClient(t *testing.T) {
+func TestCreateTransaction(t *testing.T) {
 	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")
 	templateKey := os.Getenv("BERBIX_DEMO_TEMPLATE_KEY")
@@ -24,13 +24,44 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = client.OverrideTransaction(tokens, &OverrideTransactionOptions{
+	assertTransaction(t, client, tokens)
+}
+
+func TestCreateHostedTransaction(t *testing.T) {
+	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
+	host := os.Getenv("BERBIX_DEMO_API_HOST")
+	templateKey := os.Getenv("BERBIX_DEMO_TEMPLATE_KEY")
+
+	client := NewClient(secret, &ClientOptions{
+		Host: host,
+	})
+
+	options := &CreateHostedTransactionOptions{
+		CreateTransactionOptions: CreateTransactionOptions{
+			CustomerUID: customerUID,
+			TemplateKey: templateKey,
+		},
+	}
+	resp, err := client.CreateHostedTransaction(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.HostedURL == "" {
+		t.Error("expected hosted url to be returned")
+	}
+
+	assertTransaction(t, client, &resp.Tokens)
+}
+
+func assertTransaction(t *testing.T, client Client, tokens *Tokens) {
+	err := client.OverrideTransaction(tokens, &OverrideTransactionOptions{
 		ResponsePayload: "us-dl",
-		Flags:           []string{
+		Flags: []string{
 			"id_under_21",
 		},
 		OverrideFields: map[string]string{
-			"date_of_birth": "2000-12-09",
+			"given_name": "the_name",
 		},
 	})
 	if err != nil {
@@ -54,11 +85,9 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected id_under_21 flag")
 	}
 
-	if resultsA.Fields == nil || resultsA.Fields.DateOfBirth == nil || resultsA.Fields.DateOfBirth.Value != "2000-12-09" {
-		t.Errorf("expected DateOfBirth to be 2000-12-09")
+	if resultsA.Fields == nil || resultsA.Fields.GivenName == nil || resultsA.Fields.GivenName.Value != "the_name" {
+		t.Errorf("expected GivenName to be the_name but was %s", resultsA.Fields.GivenName)
 	}
-
-	t.Log(resultsA)
 
 	refreshToken := TokensFromRefresh(tokens.RefreshToken)
 
@@ -76,11 +105,13 @@ func TestClient(t *testing.T) {
 	}
 }
 
-
 func TestDefaultClient_ValidateSignature(t *testing.T) {
 	client := NewClient("", &ClientOptions{})
 
-	err := client.ValidateSignature("whs_live_qawRQRZg0TvWJ3fytpR26U2rMkClZQ1K", "{\"user_id\":1234123412341234,\"transaction_id\":1234123412341234,\"code\":\"1234123412341234\",\"customer_uid\":\"unique-uid\",\"action\":\"test-action\",\"dashboard_link\":\"https://docs.berbix.com\"}\n", "v0,1588001033,5ddbe8b2a0fc2d5a7fd173ed9e442fc9b670add2578c06d3f2f9330a567fa434")
+	wh_secret := os.Getenv("BERBIX_WEBHOOK_SECRET")
+	body := "{\"transaction_id\":1234123412341234,\"customer_uid\":\"unique-uid\",\"action\":\"test-action\",\"dashboard_link\":\"https://docs.berbix.com\",\"id\":1234123412341234}\n"
+	header := `v0,1614990541,9731afbbb3ebcc534775bffed585265283a8ec48ba39d19f9295a2e367c0daeb`
+	err := client.ValidateSignature(wh_secret, body, header)
 	if err != nil {
 		t.Fatal(err)
 	}
