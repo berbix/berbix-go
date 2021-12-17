@@ -54,6 +54,35 @@ func TestCreateHostedTransaction(t *testing.T) {
 	assertTransaction(t, client, &resp.Tokens)
 }
 
+func TestCreateAPIOnlyTransaction(t *testing.T) {
+	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
+	host := os.Getenv("BERBIX_DEMO_API_HOST")
+	templateKey := os.Getenv("BERBIX_DEMO_API_ONLY_TEMPLATE_KEY")
+	idType := os.Getenv("BERBIX_ID_TYPE")
+	idCountry := os.Getenv("BERBIX_ID_COUNTRY")
+
+	client := NewClient(secret, &ClientOptions{
+		Host: host,
+	})
+
+	options := &CreateAPIOnlyTransactionOptions{
+		CreateTransactionOptions: CreateTransactionOptions{
+			CustomerUID: customerUID,
+			TemplateKey: templateKey,
+		},
+		APIOnlyOptions: APIOnlyOptions{
+			IDType:    idType,
+			IDCountry: idCountry,
+		},
+	}
+	resp, err := client.CreateAPIOnlyTransaction(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertTransaction(t, client, &resp.Tokens)
+}
+
 func assertTransaction(t *testing.T, client Client, tokens *Tokens) {
 	err := client.OverrideTransaction(tokens, &OverrideTransactionOptions{
 		ResponsePayload: "us-dl",
@@ -78,7 +107,7 @@ func assertTransaction(t *testing.T, client Client, tokens *Tokens) {
 	}
 
 	if len(resultsA.Flags) != 1 {
-		t.Fatal("number of flags did not match expectations")
+		t.Fatalf("number of flags did not match expectations. Flags were: %v", resultsA.Flags)
 	}
 
 	if resultsA.Flags[0] != "id_under_21" {

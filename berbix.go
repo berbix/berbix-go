@@ -25,6 +25,7 @@ const (
 type Client interface {
 	CreateTransaction(options *CreateTransactionOptions) (*Tokens, error)
 	CreateHostedTransaction(options *CreateHostedTransactionOptions) (*CreateHostedTransactionResponse, error)
+	CreateAPIOnlyTransaction(options *CreateAPIOnlyTransactionOptions) (*CreateAPIOnlyTransactionResponse, error)
 	RefreshTokens(tokens *Tokens) (*Tokens, error)
 	FetchTransaction(tokens *Tokens) (*TransactionMetadata, error)
 	DeleteTransaction(tokens *Tokens) error
@@ -80,6 +81,21 @@ func (c *defaultClient) CreateHostedTransaction(options *CreateHostedTransaction
 	return &CreateHostedTransactionResponse{
 		Tokens:    *tokens,
 		HostedURL: response.HostedURL,
+	}, nil
+}
+
+func (c *defaultClient) CreateAPIOnlyTransaction(options *CreateAPIOnlyTransactionOptions) (*CreateAPIOnlyTransactionResponse, error) {
+	if options == nil {
+		return nil, errors.New("options cannot be nil")
+	}
+	response := &tokenResponse{}
+	if err := c.postBasicAuth(v0Transactions, options, response); err != nil {
+		return nil, err
+	}
+
+	tokens := fromTokenResponse(response)
+	return &CreateAPIOnlyTransactionResponse{
+		Tokens: *tokens,
 	}, nil
 }
 
