@@ -1,6 +1,7 @@
 package berbix
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -24,7 +25,7 @@ func TestCreateTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertTransaction(t, client, tokens)
+	assertTransaction(t, client, tokens, true)
 }
 
 func TestCreateHostedTransaction(t *testing.T) {
@@ -51,15 +52,17 @@ func TestCreateHostedTransaction(t *testing.T) {
 		t.Error("expected hosted url to be returned")
 	}
 
-	assertTransaction(t, client, &resp.Tokens)
+	assertTransaction(t, client, &resp.Tokens, true)
 }
 
 func TestCreateAPIOnlyTransaction(t *testing.T) {
 	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")
 	templateKey := os.Getenv("BERBIX_DEMO_API_ONLY_TEMPLATE_KEY")
-	idType := os.Getenv("BERBIX_ID_TYPE")
-	idCountry := os.Getenv("BERBIX_ID_COUNTRY")
+	// for simplicity, hardcode assumptions
+	const idType = "P"
+	const idCountry = "CA"
+	frontUploadPath := os.Getenv("BERBIX_SAMPLE_CA_PASSPORT_PATH")
 
 	client := NewClient(secret, &ClientOptions{
 		Host: host,
@@ -75,15 +78,39 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 			IDCountry: idCountry,
 		},
 	}
-	resp, err := client.CreateAPIOnlyTransaction(options)
+	createRes, err := client.CreateAPIOnlyTransaction(options)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assertTransaction(t, client, &resp.Tokens)
+	t.Logf("will upload image at %q", frontUploadPath)
+	frontRdr, err := os.Open(frontUploadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer frontRdr.Close()
+	frontBytes, err := ioutil.ReadAll(frontRdr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("total number of bytes in image: %d", len(frontBytes))
+
+	upRes, err := client.UploadImage(frontBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const expectedNextStep = "done"
+	if upRes.NextStep != expectedNextStep {
+		t.Errorf("expected next step of %q but got %q", expectedNextStep, upRes.NextStep)
+	}
+
+	const deleteTransaction = false
+	// assertTransaction(t, client, &createRes.Tokens, deleteTransaction)
 }
 
-func assertTransaction(t *testing.T, client Client, tokens *Tokens) {
+func assertTransaction(t *testing.T, client Client, tokens *Tokens, deleteTransaction bool) {
 	err := client.OverrideTransaction(tokens, &OverrideTransactionOptions{
 		ResponsePayload: "us-dl",
 		Flags: []string{
@@ -129,8 +156,10 @@ func assertTransaction(t *testing.T, client Client, tokens *Tokens) {
 		t.Errorf("expected matching customer UID")
 	}
 
-	if err := client.DeleteTransaction(tokens); err != nil {
-		t.Fatal(err)
+	if deleteTransaction {
+		if err := client.DeleteTransaction(tokens); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

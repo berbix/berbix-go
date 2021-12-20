@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,6 +33,7 @@ type Client interface {
 	UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error)
 	OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error
 	ValidateSignature(secret, body, header string) error
+	UploadImage(image []byte, subject ImageSubject, format ImageFormat, tokens *Tokens) (*ImageUploadResponse, error)
 }
 
 type defaultClient struct {
@@ -143,6 +145,22 @@ func (c *defaultClient) UpdateTransaction(tokens *Tokens, options *UpdateTransac
 
 func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error {
 	return c.tokenAuthRequest(http.MethodPatch, tokens, "/v0/transactions/override", options, nil)
+}
+
+func (c *defaultClient) UploadImage(image []byte, subject ImageSubject, format ImageFormat, tokens *Tokens) (*ImageUploadResponse, error) {
+	encoded := base64.StdEncoding.EncodeToString(image)
+	log.Printf("encoded image is %d bytes\n", len(encoded))
+	req := &ImageUploadRequest{
+		Image: ImageData{
+			ImageSubject: subject,
+			Format:       format,
+			Data:         encoded,
+		},
+	}
+
+	resp := &ImageUploadResponse{}
+	// TODO this should cover error cases
+	return resp, c.tokenAuthRequest(http.MethodPost, tokens, "/v0/images/upload", req, resp)
 }
 
 func computeHMACSHA256(secret, message string) string {

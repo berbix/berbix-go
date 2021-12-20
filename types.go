@@ -164,3 +164,33 @@ type TransactionMetadata struct {
 	// Optional information about the response. Used in test mode only.
 	ImplementationInfo string `json:"implementation_info,omitempty"`
 }
+
+type (
+	ImageSubject string
+	ImageFormat  string
+)
+
+const (
+	ImageSubjectDocumentFront ImageSubject = "document_front"
+	ImageSubjectDocumentBack  ImageSubject = "document_back"
+
+	ImageFormatPNG  ImageFormat = "image/png"
+	ImageFormatJPEG ImageFormat = "image/jpeg"
+)
+
+type ImageData struct {
+	ImageSubject ImageSubject `json:"image_subject"`
+	Format       ImageFormat  `json:"format"`
+
+	// The base64-encoded image data
+	Data string `json:"data"`
+}
+
+type ImageUploadRequest struct {
+	Image ImageData `json:"image"`
+}
+
+type ImageUploadResponse struct {
+	PreviewFlags []string `json:"preview_flags"`
+	NextStep     string   `json:"next_step"`
+}
