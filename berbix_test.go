@@ -55,6 +55,33 @@ func TestCreateHostedTransaction(t *testing.T) {
 	assertTransaction(t, client, &resp.Tokens, true)
 }
 
+func TestImageQualityCheck(t *testing.T) {
+	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
+	host := os.Getenv("BERBIX_DEMO_API_HOST")
+	cardPath := "/Users/chris/code/src/github.com/berbix/berbix/go/src/backend/views/fixtures/can-sample-passport.jpg"
+	client := NewClient(secret, &ClientOptions{
+		Host: host,
+	})
+	frontRdr, err := os.Open(cardPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer frontRdr.Close()
+	frontBytes, err := ioutil.ReadAll(frontRdr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("total number of bytes in image: %d", len(frontBytes))
+
+	highQuality, err := client.ImageQualityCheck(frontBytes, ImageSubjectDocumentFront, ImageFormatJPEG)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("highQuality: %v", highQuality)
+}
+
 func TestCreateAPIOnlyTransaction(t *testing.T) {
 	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")

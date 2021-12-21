@@ -34,6 +34,7 @@ type Client interface {
 	OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error
 	ValidateSignature(secret, body, header string) error
 	UploadImage(image []byte, subject ImageSubject, format ImageFormat, tokens *Tokens) (*ImageUploadResponse, error)
+	ImageQualityCheck(image []byte, subject ImageSubject, format ImageFormat) (bool, error)
 }
 
 type defaultClient struct {
@@ -161,6 +162,34 @@ func (c *defaultClient) UploadImage(image []byte, subject ImageSubject, format I
 	resp := &ImageUploadResponse{}
 	// TODO this should cover error cases
 	return resp, c.tokenAuthRequest(http.MethodPost, tokens, "/v0/images/upload", req, resp)
+}
+
+type ImageQualityResponse struct {
+	SufficientQuality bool `json:"sufficient_quality"`
+}
+
+func (c *defaultClient) ImageQualityCheck(image []byte, subject ImageSubject, format ImageFormat) (bool, error) {
+	encoded := base64.StdEncoding.EncodeToString(image)
+	log.Printf("encoded image is %d bytes\n", len(encoded))
+	req := &ImageUploadRequest{
+		Image: ImageData{
+			ImageSubject: subject,
+			Format:       format,
+			Data:         encoded,
+		},
+	}
+
+	const uploadPath = "/v0/images/quality"
+	resp := &ImageQualityResponse{}
+	if err := c.postBasicAuth(uploadPath, req, resp); err != nil {
+		return false, err
+	}
+
+	if !resp.SufficientQuality {
+		log.Println("image is of insufficient quality!")
+	}
+
+	return resp.SufficientQuality, nil
 }
 
 func computeHMACSHA256(secret, message string) string {
