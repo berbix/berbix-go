@@ -58,7 +58,7 @@ func TestCreateHostedTransaction(t *testing.T) {
 func TestImageQualityCheck(t *testing.T) {
 	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")
-	cardPath := "/Users/chris/code/src/github.com/berbix/berbix/go/src/backend/views/fixtures/can-sample-passport.jpg"
+	cardPath := os.Getenv("BERBIX_SAMPLE_CA_PASSPORT_PATH")
 	client := NewClient(secret, &ClientOptions{
 		Host: host,
 	})
@@ -133,8 +133,13 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 		t.Errorf("expected next step of %q but got %q", expectedNextStep, upRes.NextStep)
 	}
 
+	_, err = client.UploadImage(frontBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	if _, ok := err.(InvalidStateErr); !ok {
+		t.Errorf("expected invalid state error, got %v", err)
+	}
+
 	const deleteTransaction = false
-	// assertTransaction(t, client, &createRes.Tokens, deleteTransaction)
+	assertTransaction(t, client, &createRes.Tokens, deleteTransaction)
 }
 
 func assertTransaction(t *testing.T, client Client, tokens *Tokens, deleteTransaction bool) {
@@ -187,6 +192,34 @@ func assertTransaction(t *testing.T, client Client, tokens *Tokens, deleteTransa
 		if err := client.DeleteTransaction(tokens); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestUploadOversizedImageAPIOnly(t *testing.T) {
+	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
+	host := os.Getenv("BERBIX_DEMO_API_HOST")
+	templateKey := os.Getenv("BERBIX_DEMO_API_ONLY_TEMPLATE_KEY")
+
+	client := NewClient(secret, &ClientOptions{
+		Host: host,
+	})
+
+	options := &CreateAPIOnlyTransactionOptions{
+		CreateTransactionOptions: CreateTransactionOptions{
+			CustomerUID: customerUID,
+			TemplateKey: templateKey,
+		},
+		APIOnlyOptions: APIOnlyOptions{},
+	}
+	createRes, err := client.CreateAPIOnlyTransaction(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tooManyBytes := make([]byte, 11*1024*1024*1024)
+	_, err = client.UploadImage(tooManyBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	if _, ok := err.(PayloadTooLargeErr); !ok {
+		t.Errorf("expected to get a PayloadTooLargeErr, but got %v", err)
 	}
 }
 

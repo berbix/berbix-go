@@ -150,12 +150,12 @@ func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTra
 
 // UploadImage uploads an image to Berbix and provides a response that indicates the next upload, if any,
 // that is expected, along with flags indicating any issues with the image that could immediately be detected.
+// UploadImage expects a slice of bytes representing an image in a supported format, such as JPEG or PNG.
 // Returns a InvalidStateErr if the upload was invalid for the current state of the transaction.
 // Returns a TransactionDoesNotExistErr if the transaction for which the image is being uploaded no longer exists.
 // Returns a PayloadTooLargeErr if the uploaded payload or underlying image is too large.
 func (c *defaultClient) UploadImage(image []byte, subject ImageSubject, format ImageFormat, tokens *Tokens) (*ImageUploadResult, error) {
 	encoded := base64.StdEncoding.EncodeToString(image)
-	log.Printf("encoded image is %d bytes\n", len(encoded))
 	req := &ImageUploadRequest{
 		Image: ImageData{
 			ImageSubject: subject,
@@ -222,7 +222,6 @@ type ImageQualityResponse struct {
 
 func (c *defaultClient) ImageQualityCheck(image []byte, subject ImageSubject, format ImageFormat) (bool, error) {
 	encoded := base64.StdEncoding.EncodeToString(image)
-	log.Printf("encoded image is %d bytes\n", len(encoded))
 	req := &ImageUploadRequest{
 		Image: ImageData{
 			ImageSubject: subject,
@@ -275,7 +274,7 @@ func (c *defaultClient) tokenAuthRequestExpecting2XX(method string, tokens *Toke
 	if err != nil {
 		return err
 	}
-	return c.client.RequestExpecting2XX(method, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
+	return requestExpecting2XX(c.client, method, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
 }
 
 func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path string, payload interface{}) (*HTTPResponse, error) {
@@ -334,7 +333,7 @@ func (c *defaultClient) postBasicAuth(path string, payload interface{}, dst inte
 		"User-Agent":    fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": c.basicAuth(),
 	}
-	return c.client.RequestExpecting2XX(http.MethodPost, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
+	return requestExpecting2XX(c.client, http.MethodPost, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
 }
 
 func (c *defaultClient) makeURL(path string) string {

@@ -14,7 +14,6 @@ type RequestOptions struct {
 
 type HTTPClient interface {
 	Request(method string, url string, headers map[string]string, options *RequestOptions) (*HTTPResponse, error)
-	RequestExpecting2XX(method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) error
 }
 
 type DefaultHTTPClient struct {
@@ -57,9 +56,8 @@ func (d *DefaultHTTPClient) Request(method string, url string, headers map[strin
 	}, nil
 }
 
-// TODO(chris) before publishing this, we should make this a func that accepts a client
-func (d *DefaultHTTPClient) RequestExpecting2XX(method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) (err error) {
-	res, err := d.Request(method, url, headers, options)
+func requestExpecting2XX(c HTTPClient, method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) (err error) {
+	res, err := c.Request(method, url, headers, options)
 	if err != nil {
 		return err
 	}
