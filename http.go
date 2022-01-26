@@ -13,17 +13,32 @@ type RequestOptions struct {
 }
 
 type HTTPClient interface {
-	Request(method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) error
+	Request(method string, url string, headers map[string]string, options *RequestOptions) (*HTTPResponse, error)
+	RequestExpecting2XX(method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) error
 }
 
 type DefaultHTTPClient struct {
 	client *http.Client
 }
 
-func (d *DefaultHTTPClient) Request(method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) (err error) {
+type Non2XXErr struct {
+	StatusCode int
+}
+
+func (n *Non2XXErr) Error() string {
+	return fmt.Sprintf("non-2XX response from Berbix backend %d", n.StatusCode)
+}
+
+type HTTPResponse struct {
+	StatusCode int
+	Body       io.ReadCloser
+	Headers    map[string][]string
+}
+
+func (d *DefaultHTTPClient) Request(method string, url string, headers map[string]string, options *RequestOptions) (*HTTPResponse, error) {
 	req, err := http.NewRequest(method, url, options.Body)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("error creating HTTP request: %v", err)
 	}
 
 	for header, value := range headers {
@@ -32,7 +47,21 @@ func (d *DefaultHTTPClient) Request(method string, url string, headers map[strin
 
 	res, err := d.client.Do(req)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("error performing HTTP request: %v", err)
+	}
+
+	return &HTTPResponse{
+		StatusCode: res.StatusCode,
+		Body:       res.Body,
+		Headers:    res.Header,
+	}, nil
+}
+
+// TODO(chris) before publishing this, we should make this a func that accepts a client
+func (d *DefaultHTTPClient) RequestExpecting2XX(method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) (err error) {
+	res, err := d.Request(method, url, headers, options)
+	if err != nil {
+		return err
 	}
 	defer func() {
 		err = res.Body.Close()
