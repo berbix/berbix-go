@@ -20,14 +20,6 @@ type DefaultHTTPClient struct {
 	client *http.Client
 }
 
-type Non2XXErr struct {
-	StatusCode int
-}
-
-func (n *Non2XXErr) Error() string {
-	return fmt.Sprintf("non-2XX response from Berbix backend %d", n.StatusCode)
-}
-
 type HTTPResponse struct {
 	StatusCode int
 	Body       io.ReadCloser
