@@ -111,7 +111,57 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 		t.Errorf("expected invalid state error, got %v", err)
 	}
 
+	// Can't override because transaction has already been completed, so just make
+	// sure we can get the transaction metadata
+	assertCustomerUIDFromAPI(t, client, &createRes.Tokens)
+}
+
+func TestOverrideAPIOnlyTransaction(t *testing.T) {
+	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
+	host := os.Getenv("BERBIX_DEMO_API_HOST")
+	templateKey := os.Getenv("BERBIX_DEMO_API_ONLY_TEMPLATE_KEY")
+	// for simplicity, hardcode assumptions
+	const idType = "DL"
+	const idCountry = "US"
+
+	client := NewClient(secret, &ClientOptions{
+		Host: host,
+	})
+
+	options := &CreateAPIOnlyTransactionOptions{
+		CreateTransactionOptions: CreateTransactionOptions{
+			CustomerUID: customerUID,
+			TemplateKey: templateKey,
+		},
+		APIOnlyOptions: APIOnlyOptions{
+			IDType:    idType,
+			IDCountry: idCountry,
+		},
+	}
+	createRes, err := client.CreateAPIOnlyTransaction(options)
+	if err != nil {
+		t.Fatal(err)
+
+	}
+	frontUploadPath := os.Getenv("BERBIX_SAMPLE_DL_FRONT_PATH")
+	t.Logf("will upload image at %q", frontUploadPath)
+	frontRdr, err := os.Open(frontUploadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer frontRdr.Close()
+	frontBytes, err := ioutil.ReadAll(frontRdr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("total number of bytes in image: %d", len(frontBytes))
 	const deleteTransaction = false
+	upRes, err := client.UploadImage(frontBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("upRes: %+v", upRes)
 	assertTransaction(t, client, &createRes.Tokens, deleteTransaction)
 }
 
@@ -129,14 +179,7 @@ func assertTransaction(t *testing.T, client Client, tokens *Tokens, deleteTransa
 		t.Fatal(err)
 	}
 
-	resultsA, err := client.FetchTransaction(tokens)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if resultsA.CustomerUID != customerUID {
-		t.Errorf("customer UID did not match expectations")
-	}
+	resultsA := assertCustomerUIDFromAPI(t, client, tokens)
 
 	if len(resultsA.Flags) != 1 {
 		t.Fatalf("number of flags did not match expectations. Flags were: %v", resultsA.Flags)
@@ -147,7 +190,7 @@ func assertTransaction(t *testing.T, client Client, tokens *Tokens, deleteTransa
 	}
 
 	if resultsA.Fields == nil || resultsA.Fields.GivenName == nil || resultsA.Fields.GivenName.Value != "the_name" {
-		t.Errorf("expected GivenName to be the_name but was %s", resultsA.Fields.GivenName)
+		t.Errorf("expected GivenName to be the_name but was %s", resultsA.Fields.GivenName.Value)
 	}
 
 	refreshToken := TokensFromRefresh(tokens.RefreshToken)
@@ -166,6 +209,18 @@ func assertTransaction(t *testing.T, client Client, tokens *Tokens, deleteTransa
 			t.Fatal(err)
 		}
 	}
+}
+
+func assertCustomerUIDFromAPI(t *testing.T, client Client, tokens *Tokens) *TransactionMetadata {
+	resultsA, err := client.FetchTransaction(tokens)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resultsA.CustomerUID != customerUID {
+		t.Errorf("customer UID did not match expectations")
+	}
+	return resultsA
 }
 
 func TestUploadOversizedImageAPIOnly(t *testing.T) {
