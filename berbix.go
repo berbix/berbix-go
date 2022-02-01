@@ -32,7 +32,7 @@ type Client interface {
 	UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error)
 	OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error
 	ValidateSignature(secret, body, header string) error
-	UploadImage(image []byte, subject ImageSubject, format ImageFormat, tokens *Tokens) (*ImageUploadResult, error)
+	UploadImage(tokens *Tokens, options *UploadImageOptions) (*ImageUploadResult, error)
 }
 
 type defaultClient struct {
@@ -146,18 +146,30 @@ func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTra
 	return c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, "/v0/transactions/override", options, nil)
 }
 
+type UploadImageOptions struct {
+	image   []byte
+	subject ImageSubject
+	format  ImageFormat
+}
+
 // UploadImage uploads an image to Berbix and provides a response that indicates the next upload, if any,
 // that is expected, along with flags indicating any issues with the image that could immediately be detected.
 // UploadImage expects a slice of bytes representing an image in a supported format, such as JPEG or PNG.
 // Returns a InvalidStateErr if the upload was invalid for the current state of the transaction.
 // Returns a TransactionDoesNotExistErr if the transaction for which the image is being uploaded no longer exists.
 // Returns a PayloadTooLargeErr if the uploaded payload or underlying image is too large.
-func (c *defaultClient) UploadImage(image []byte, subject ImageSubject, format ImageFormat, tokens *Tokens) (*ImageUploadResult, error) {
-	encoded := base64.StdEncoding.EncodeToString(image)
+func (c *defaultClient) UploadImage(tokens *Tokens, options *UploadImageOptions) (*ImageUploadResult, error) {
+	if options == nil {
+		return nil, errors.New("must specify non-nil UploadImageOptions")
+	}
+	if options.image == nil {
+		return nil, errors.New("must specify non-nil image bytes")
+	}
+	encoded := base64.StdEncoding.EncodeToString(options.image)
 	req := &ImageUploadRequest{
 		Image: ImageData{
-			ImageSubject: subject,
-			Format:       format,
+			ImageSubject: options.subject,
+			Format:       options.format,
 			Data:         encoded,
 		},
 	}

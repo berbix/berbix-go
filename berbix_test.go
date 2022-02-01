@@ -96,7 +96,12 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 
 	t.Logf("total number of bytes in image: %d", len(frontBytes))
 
-	upRes, err := client.UploadImage(frontBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	opts := &UploadImageOptions{
+		image:   frontBytes,
+		subject: ImageSubjectDocumentFront,
+		format:  ImageFormatJPEG,
+	}
+	upRes, err := client.UploadImage(&createRes.Tokens, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +111,12 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 		t.Errorf("expected next step of %q but got %q", expectedNextStep, upRes.NextStep)
 	}
 
-	_, err = client.UploadImage(frontBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	opts = &UploadImageOptions{
+		image:   frontBytes,
+		subject: ImageSubjectDocumentFront,
+		format:  ImageFormatJPEG,
+	}
+	_, err = client.UploadImage(&createRes.Tokens, opts)
 	if _, ok := err.(InvalidStateErr); !ok {
 		t.Errorf("expected invalid state error, got %v", err)
 	}
@@ -156,12 +166,17 @@ func TestOverrideAPIOnlyTransaction(t *testing.T) {
 	}
 
 	t.Logf("total number of bytes in image: %d", len(frontBytes))
-	const deleteTransaction = false
-	upRes, err := client.UploadImage(frontBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	opts := &UploadImageOptions{
+		image:   frontBytes,
+		subject: ImageSubjectDocumentFront,
+		format:  ImageFormatJPEG,
+	}
+	upRes, err := client.UploadImage(&createRes.Tokens, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("upRes: %+v", upRes)
+	const deleteTransaction = false
 	assertTransaction(t, client, &createRes.Tokens, deleteTransaction)
 }
 
@@ -245,7 +260,12 @@ func TestUploadOversizedImageAPIOnly(t *testing.T) {
 	}
 
 	tooManyBytes := make([]byte, 11*1024*1024*1024)
-	_, err = client.UploadImage(tooManyBytes, ImageSubjectDocumentFront, ImageFormatJPEG, &createRes.Tokens)
+	opts := &UploadImageOptions{
+		image:   tooManyBytes,
+		subject: ImageSubjectDocumentFront,
+		format:  ImageFormatJPEG,
+	}
+	_, err = client.UploadImage(&createRes.Tokens, opts)
 	if _, ok := err.(PayloadTooLargeErr); !ok {
 		t.Errorf("expected to get a PayloadTooLargeErr, but got %v", err)
 	}
