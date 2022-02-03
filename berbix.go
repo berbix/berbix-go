@@ -25,12 +25,14 @@ const (
 type Client interface {
 	CreateTransaction(options *CreateTransactionOptions) (*Tokens, error)
 	CreateHostedTransaction(options *CreateHostedTransactionOptions) (*CreateHostedTransactionResponse, error)
+	CreateAPIOnlyTransaction(options *CreateAPIOnlyTransactionOptions) (*CreateAPIOnlyTransactionResponse, error)
 	RefreshTokens(tokens *Tokens) (*Tokens, error)
 	FetchTransaction(tokens *Tokens) (*TransactionMetadata, error)
 	DeleteTransaction(tokens *Tokens) error
 	UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error)
 	OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error
 	ValidateSignature(secret, body, header string) error
+	UploadImage(tokens *Tokens, options *UploadImageOptions) (*ImageUploadResult, error)
 }
 
 type defaultClient struct {
@@ -83,6 +85,21 @@ func (c *defaultClient) CreateHostedTransaction(options *CreateHostedTransaction
 	}, nil
 }
 
+func (c *defaultClient) CreateAPIOnlyTransaction(options *CreateAPIOnlyTransactionOptions) (*CreateAPIOnlyTransactionResponse, error) {
+	if options == nil {
+		return nil, errors.New("options cannot be nil")
+	}
+	response := &tokenResponse{}
+	if err := c.postBasicAuth(v0Transactions, options, response); err != nil {
+		return nil, err
+	}
+
+	tokens := fromTokenResponse(response)
+	return &CreateAPIOnlyTransactionResponse{
+		Tokens: *tokens,
+	}, nil
+}
+
 func (c *defaultClient) RefreshTokens(tokens *Tokens) (*Tokens, error) {
 	if tokens == nil {
 		return nil, errors.New("tokens cannot be nil")
@@ -102,14 +119,14 @@ func (c *defaultClient) FetchTransaction(tokens *Tokens) (*TransactionMetadata, 
 		return nil, errors.New("tokens cannot be nil")
 	}
 	metadata := &TransactionMetadata{}
-	return metadata, c.tokenAuthRequest(http.MethodGet, tokens, v0Transactions, nil, metadata)
+	return metadata, c.tokenAuthRequestExpecting2XX(http.MethodGet, tokens, v0Transactions, nil, metadata)
 }
 
 func (c *defaultClient) DeleteTransaction(tokens *Tokens) error {
 	if tokens == nil {
 		return errors.New("tokens cannot be nil")
 	}
-	return c.tokenAuthRequest(http.MethodDelete, tokens, v0Transactions, nil, nil)
+	return c.tokenAuthRequestExpecting2XX(http.MethodDelete, tokens, v0Transactions, nil, nil)
 }
 
 func (c *defaultClient) UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error) {
@@ -122,11 +139,91 @@ func (c *defaultClient) UpdateTransaction(tokens *Tokens, options *UpdateTransac
 	}
 
 	metadata := &TransactionMetadata{}
-	return metadata, c.tokenAuthRequest(http.MethodPatch, tokens, v0Transactions, options, metadata)
+	return metadata, c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, v0Transactions, options, metadata)
 }
 
 func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error {
-	return c.tokenAuthRequest(http.MethodPatch, tokens, "/v0/transactions/override", options, nil)
+	return c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, "/v0/transactions/override", options, nil)
+}
+
+type UploadImageOptions struct {
+	image   []byte
+	subject ImageSubject
+	format  ImageFormat
+}
+
+// UploadImage uploads an image to Berbix and provides a response that indicates the next upload, if any,
+// that is expected, along with flags indicating any issues with the image that could immediately be detected.
+// UploadImage expects a slice of bytes representing an image in a supported format, such as JPEG or PNG.
+// Returns a InvalidStateErr if the upload was invalid for the current state of the transaction.
+// Returns a TransactionDoesNotExistErr if the transaction for which the image is being uploaded no longer exists.
+// Returns a PayloadTooLargeErr if the uploaded payload or underlying image is too large.
+func (c *defaultClient) UploadImage(tokens *Tokens, options *UploadImageOptions) (*ImageUploadResult, error) {
+	if options == nil {
+		return nil, errors.New("must specify non-nil UploadImageOptions")
+	}
+	if options.image == nil {
+		return nil, errors.New("must specify non-nil image bytes")
+	}
+	encoded := base64.StdEncoding.EncodeToString(options.image)
+	req := &ImageUploadRequest{
+		Image: ImageData{
+			ImageSubject: options.subject,
+			Format:       options.format,
+			Data:         encoded,
+		},
+	}
+
+	httpResp, err := c.tokenAuthRequest(http.MethodPost, tokens, "/v0/images/upload", req)
+	if err != nil {
+		return nil, err
+	}
+	defer httpResp.Body.Close()
+	bodyDec := json.NewDecoder(httpResp.Body)
+	switch httpResp.StatusCode {
+	case http.StatusOK, http.StatusUnprocessableEntity:
+		imageResp := ImageUploadResponse{}
+		if err := bodyDec.Decode(&imageResp); err != nil {
+			return nil, fmt.Errorf("error unmarshalling response: %v", err)
+		}
+		return &ImageUploadResult{
+			IsAcceptableIDType:  httpResp.StatusCode != http.StatusUnprocessableEntity,
+			ImageUploadResponse: imageResp,
+		}, nil
+	case http.StatusConflict:
+		invalidStateRes := InvalidUploadForStateResponse{}
+		if err := bodyDec.Decode(&invalidStateRes); err != nil {
+			return nil, fmt.Errorf("got malformed response body for status code %d", httpResp.StatusCode)
+		}
+
+		return nil, InvalidStateErr{
+			InvalidUploadForStateResponse: invalidStateRes,
+		}
+	case http.StatusGone:
+		const defaultMsg = "The transaction for this upload does not exist. It may have been deleted."
+		msgErr := makeErrorMessage(bodyDec, defaultMsg)
+		return nil, TransactionDoesNotExistErr{errorMessage: msgErr}
+	case http.StatusRequestEntityTooLarge:
+		const defaultMsg = "Request body or image too large."
+		msgErr := makeErrorMessage(bodyDec, defaultMsg)
+		return nil, PayloadTooLargeErr{errorMessage: msgErr}
+	default:
+		return nil, GenericErr{
+			StatusCode: httpResp.StatusCode,
+			Message:    fmt.Sprintf("got unexpected response code %d", httpResp.StatusCode),
+		}
+	}
+}
+
+func makeErrorMessage(bodyDec *json.Decoder, defaultMsg string) errorMessage {
+	var msg string
+	genErr := GenericErrorResponse{}
+	if err := bodyDec.Decode(&genErr); err == nil {
+		msg = genErr.Message
+	} else {
+		msg = defaultMsg
+	}
+	return errorMessage{Message: msg}
 }
 
 func computeHMACSHA256(secret, message string) string {
@@ -155,19 +252,36 @@ func (c *defaultClient) ValidateSignature(secret, body, header string) error {
 	return nil
 }
 
-func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path string, payload interface{}, dst interface{}) error {
-	var err error
+func (c *defaultClient) tokenAuthRequestExpecting2XX(method string, tokens *Tokens, path string, payload interface{}, dst interface{}) error {
+	body, headers, err := c.prepTokenAuthRequest(tokens, payload)
+	if err != nil {
+		return err
+	}
+	return requestExpecting2XX(c.client, method, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
+}
+
+func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path string, payload interface{}) (*HTTPResponse, error) {
+	body, headers, err := c.prepTokenAuthRequest(tokens, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.client.Request(method, c.makeURL(path), headers, &RequestOptions{Body: body})
+}
+
+func (c *defaultClient) prepTokenAuthRequest(tokens *Tokens, payload interface{},
+) (reqBody io.Reader, reqHeaders map[string]string, err error) {
 	if tokens.NeedsRefresh() {
 		tokens, err = c.RefreshTokens(tokens)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 	var body io.Reader
 	if payload != nil {
 		data, err := json.Marshal(payload)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		body = bytes.NewReader(data)
 	}
@@ -176,7 +290,7 @@ func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path str
 		"User-Agent":    fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": fmt.Sprintf("Bearer %s", tokens.AccessToken),
 	}
-	return c.client.Request(method, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
+	return body, headers, nil
 }
 
 func (c *defaultClient) fetchTokens(path string, payload interface{}) (*Tokens, error) {
@@ -202,7 +316,7 @@ func (c *defaultClient) postBasicAuth(path string, payload interface{}, dst inte
 		"User-Agent":    fmt.Sprintf("BerbixGo/%s", sdkVersion),
 		"Authorization": c.basicAuth(),
 	}
-	return c.client.Request(http.MethodPost, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
+	return requestExpecting2XX(c.client, http.MethodPost, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
 }
 
 func (c *defaultClient) makeURL(path string) string {

@@ -1,6 +1,7 @@
 package berbix
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -163,4 +164,104 @@ type TransactionMetadata struct {
 
 	// Optional information about the response. Used in test mode only.
 	ImplementationInfo string `json:"implementation_info,omitempty"`
+}
+
+type (
+	ImageSubject string
+	ImageFormat  string
+)
+
+const (
+	ImageSubjectDocumentFront ImageSubject = "document_front"
+	ImageSubjectDocumentBack  ImageSubject = "document_back"
+
+	ImageFormatPNG  ImageFormat = "image/png"
+	ImageFormatJPEG ImageFormat = "image/jpeg"
+)
+
+type ImageData struct {
+	ImageSubject ImageSubject `json:"image_subject"`
+	Format       ImageFormat  `json:"format"`
+
+	// The base64-encoded image data
+	Data string `json:"data"`
+}
+
+type ImageUploadRequest struct {
+	Image ImageData `json:"image"`
+}
+
+type NextStep string
+
+type ImageUploadResponse struct {
+	PreviewFlags []string `json:"preview_flags"`
+	NextStep     NextStep `json:"next_step"`
+}
+
+const (
+	NextStepUploadDocumentFront NextStep = "upload_document_front"
+	NextStepUploadDocumentBack  NextStep = "upload_document_back"
+	// NextStepDone indicates that no more uploads are expected.
+	NextStepDone NextStep = "done"
+)
+
+type ImageUploadResult struct {
+	// IsAcceptableIDType indicates whether this is an ID type that Berbix can accept.
+	// This will be set to false for ID types we can't accept, such as military IDs.
+	IsAcceptableIDType bool
+	// The NextStep of ImageUploadResponse should be inspected to determine the next step the
+	// API expects, e.g. uploading another image.
+	// Similarly, the PreviewFlags will indicate legibility issues or other information that
+	// could immediately be determined from the upload.
+	ImageUploadResponse
+}
+
+type InvalidUploadForStateResponse struct {
+	// The next step to take given the current state.
+	NextStep string `json:"next_step"`
+	// A message describing the error to aid debugging
+	Message string `json:"message"`
+}
+
+type InvalidStateErr struct {
+	InvalidUploadForStateResponse
+}
+
+func (i InvalidStateErr) Error() string {
+	return fmt.Sprintf(
+		"Invalid API interaction for the current state of the tranasction. Next expected step: %q. Message: %q.",
+		i.NextStep, i.Message)
+}
+
+type errorMessage struct {
+	// This is exported so that it can be accessed outside the package when
+	// errorMessage is embedded in other structs
+	Message string
+}
+
+func (e errorMessage) Error() string {
+	return e.Message
+}
+
+type TransactionDoesNotExistErr struct {
+	errorMessage
+}
+
+type PayloadTooLargeErr struct {
+	errorMessage
+}
+
+type GenericErr struct {
+	StatusCode int
+	Message    string
+}
+
+func (g GenericErr) Error() string {
+	return g.Message
+}
+
+type GenericErrorResponse struct {
+	StatusCode int    `json:"code"`
+	Readable   string `json:"readable,omitempty"`
+	Message    string `json:"message"`
 }
