@@ -188,7 +188,7 @@ type ImageData struct {
 }
 
 type ImageUploadRequest struct {
-	Image ImageData `json:"image"`
+	Images []ImageData `json:"images"`
 }
 
 type NextStep string

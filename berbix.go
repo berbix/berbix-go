@@ -32,7 +32,7 @@ type Client interface {
 	UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error)
 	OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error
 	ValidateSignature(secret, body, header string) error
-	UploadImage(tokens *Tokens, options *UploadImageOptions) (*ImageUploadResult, error)
+	UploadImages(tokens *Tokens, options *UploadImagesOptions) (*ImageUploadResult, error)
 }
 
 type defaultClient struct {
@@ -146,32 +146,43 @@ func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTra
 	return c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, "/v0/transactions/override", options, nil)
 }
 
-type UploadImageOptions struct {
-	image   []byte
-	subject ImageSubject
-	format  ImageFormat
+type RawImage struct {
+	// Bytes representing the image. This should represent the image in a supported
+	// format, such as JPEG or PNG, without extra encoding, such as base 64, encoding applied.
+	Image   []byte
+	Subject ImageSubject
+	Format  ImageFormat
 }
 
-// UploadImage uploads an image to Berbix and provides a response that indicates the next upload, if any,
-// that is expected, along with flags indicating any issues with the image that could immediately be detected.
-// UploadImage expects a slice of bytes representing an image in a supported format, such as JPEG or PNG.
+type UploadImagesOptions struct {
+	Images []RawImage
+}
+
+// UploadImages uploads image(s) to Berbix and provides a response that indicates the next upload, if any,
+// that is expected, along with flags indicating any issues with the image(s) that could immediately be detected.
+// The options argument is required.
 // Returns a InvalidStateErr if the upload was invalid for the current state of the transaction.
 // Returns a TransactionDoesNotExistErr if the transaction for which the image is being uploaded no longer exists.
 // Returns a PayloadTooLargeErr if the uploaded payload or underlying image is too large.
-func (c *defaultClient) UploadImage(tokens *Tokens, options *UploadImageOptions) (*ImageUploadResult, error) {
+func (c *defaultClient) UploadImages(tokens *Tokens, options *UploadImagesOptions) (*ImageUploadResult, error) {
 	if options == nil {
 		return nil, errors.New("must specify non-nil UploadImageOptions")
 	}
-	if options.image == nil {
-		return nil, errors.New("must specify non-nil image bytes")
+	if options.Images == nil {
+		return nil, errors.New("must specify non-nil Images")
 	}
-	encoded := base64.StdEncoding.EncodeToString(options.image)
-	req := &ImageUploadRequest{
-		Image: ImageData{
-			ImageSubject: options.subject,
-			Format:       options.format,
+	imageDatas := make([]ImageData, len(options.Images))
+	for i, rawImage := range options.Images {
+		encoded := base64.StdEncoding.EncodeToString(rawImage.Image)
+		imageDatas[i] = ImageData{
+			ImageSubject: rawImage.Subject,
+			Format:       rawImage.Format,
 			Data:         encoded,
-		},
+		}
+	}
+
+	req := &ImageUploadRequest{
+		Images: imageDatas,
 	}
 
 	httpResp, err := c.tokenAuthRequest(http.MethodPost, tokens, "/v0/images/upload", req)

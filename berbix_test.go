@@ -96,12 +96,16 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 
 	t.Logf("total number of bytes in image: %d", len(frontBytes))
 
-	opts := &UploadImageOptions{
-		image:   frontBytes,
-		subject: ImageSubjectDocumentFront,
-		format:  ImageFormatJPEG,
+	opts := &UploadImagesOptions{
+		Images: []RawImage{
+			{
+				Image:   frontBytes,
+				Subject: ImageSubjectDocumentFront,
+				Format:  ImageFormatJPEG,
+			},
+		},
 	}
-	upRes, err := client.UploadImage(&createRes.Tokens, opts)
+	upRes, err := client.UploadImages(&createRes.Tokens, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,12 +115,16 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 		t.Errorf("expected next step of %q but got %q", expectedNextStep, upRes.NextStep)
 	}
 
-	opts = &UploadImageOptions{
-		image:   frontBytes,
-		subject: ImageSubjectDocumentFront,
-		format:  ImageFormatJPEG,
+	opts = &UploadImagesOptions{
+		Images: []RawImage{
+			{
+				Image:   frontBytes,
+				Subject: ImageSubjectDocumentFront,
+				Format:  ImageFormatJPEG,
+			},
+		},
 	}
-	_, err = client.UploadImage(&createRes.Tokens, opts)
+	_, err = client.UploadImages(&createRes.Tokens, opts)
 	if _, ok := err.(InvalidStateErr); !ok {
 		t.Errorf("expected invalid state error, got %v", err)
 	}
@@ -166,12 +174,16 @@ func TestOverrideAPIOnlyTransaction(t *testing.T) {
 	}
 
 	t.Logf("total number of bytes in image: %d", len(frontBytes))
-	opts := &UploadImageOptions{
-		image:   frontBytes,
-		subject: ImageSubjectDocumentFront,
-		format:  ImageFormatJPEG,
+	opts := &UploadImagesOptions{
+		Images: []RawImage{
+			{
+				Image:   frontBytes,
+				Subject: ImageSubjectDocumentFront,
+				Format:  ImageFormatJPEG,
+			},
+		},
 	}
-	upRes, err := client.UploadImage(&createRes.Tokens, opts)
+	upRes, err := client.UploadImages(&createRes.Tokens, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,12 +272,16 @@ func TestUploadOversizedImageAPIOnly(t *testing.T) {
 	}
 
 	tooManyBytes := make([]byte, 11*1024*1024*1024)
-	opts := &UploadImageOptions{
-		image:   tooManyBytes,
-		subject: ImageSubjectDocumentFront,
-		format:  ImageFormatJPEG,
+	opts := &UploadImagesOptions{
+		Images: []RawImage{
+			{
+				Image:   tooManyBytes,
+				Subject: ImageSubjectDocumentFront,
+				Format:  ImageFormatJPEG,
+			},
+		},
 	}
-	_, err = client.UploadImage(&createRes.Tokens, opts)
+	_, err = client.UploadImages(&createRes.Tokens, opts)
 	if _, ok := err.(PayloadTooLargeErr); !ok {
 		t.Errorf("expected to get a PayloadTooLargeErr, but got %v", err)
 	}
