@@ -5,10 +5,11 @@ import (
 )
 
 type CreateTransactionOptions struct {
-	CustomerUID string `json:"customer_uid"`
-	TemplateKey string `json:"template_key"`
-	Email       string `json:"email"`
-	Phone       string `json:"phone"`
+	CustomerUID                          string `json:"customer_uid"`
+	TemplateKey                          string `json:"template_key"`
+	Email                                string `json:"email"`
+	Phone                                string `json:"phone"`
+	ConsentsToAutomatedFacialRecognition string `json:"consents_to_automated_facial_recognition"`
 }
 
 type UpdateTransactionOptions struct {
