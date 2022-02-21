@@ -174,6 +174,10 @@ type (
 const (
 	ImageSubjectDocumentFront ImageSubject = "document_front"
 	ImageSubjectDocumentBack  ImageSubject = "document_back"
+	ImageSubjectBarcode       ImageSubject = "document_barcode"
+	ImageSubjectSelfieFront   ImageSubject = "selfie_front"
+	ImageSubjectSelfieLeft    ImageSubject = "selfie_left"
+	ImageSubjectSelfieRight   ImageSubject = "selfie_right"
 
 	ImageFormatPNG  ImageFormat = "image/png"
 	ImageFormatJPEG ImageFormat = "image/jpeg"
@@ -199,8 +203,10 @@ type ImageUploadResponse struct {
 }
 
 const (
-	NextStepUploadDocumentFront NextStep = "upload_document_front"
-	NextStepUploadDocumentBack  NextStep = "upload_document_back"
+	NextStepUploadDocumentFront  NextStep = "upload_document_front"
+	NextStepUploadDocumentBack   NextStep = "upload_document_back"
+	NextStepUploadSelfieBasic    NextStep = "upload_selfie_basic"
+	NextStepUploadSelfieLiveness NextStep = "upload_selfie_liveness"
 	// NextStepDone indicates that no more uploads are expected.
 	NextStepDone NextStep = "done"
 )
