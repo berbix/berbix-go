@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -50,6 +51,7 @@ func (d *DefaultHTTPClient) Request(method string, url string, headers map[strin
 
 func requestExpecting2XX(c HTTPClient, method string, url string, headers map[string]string, options *RequestOptions, dst interface{}) (err error) {
 	res, err := c.Request(method, url, headers, options)
+	log.Printf("printing response %v", res)
 	if err != nil {
 		return err
 	}
