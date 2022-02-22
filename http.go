@@ -54,7 +54,10 @@ func requestExpecting2XX(c HTTPClient, method string, url string, headers map[st
 		return err
 	}
 	defer func() {
-		err = res.Body.Close()
+		bodyCloseErr := res.Body.Close()
+		if err == nil && bodyCloseErr != nil {
+			err = bodyCloseErr
+		}
 	}()
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
