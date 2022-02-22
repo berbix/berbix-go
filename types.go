@@ -10,7 +10,7 @@ type CreateTransactionOptions struct {
 	TemplateKey                          string `json:"template_key"`
 	Email                                string `json:"email"`
 	Phone                                string `json:"phone"`
-	ConsentsToAutomatedFacialRecognition string `json:"consents_to_automated_facial_recognition"`
+	ConsentsToAutomatedFacialRecognition *bool  `json:"consents_to_automated_facial_recognition"`
 }
 
 type UpdateTransactionOptions struct {
