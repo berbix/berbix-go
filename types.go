@@ -225,7 +225,7 @@ type ImageUploadResult struct {
 
 type InvalidUploadForStateResponse struct {
 	// The next step to take given the current state.
-	NextStep string `json:"next_step"`
+	NextStep NextStep `json:"next_step"`
 	// A message describing the error to aid debugging
 	Message string `json:"message"`
 }
