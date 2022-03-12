@@ -31,7 +31,7 @@ func TestCreateTransaction(t *testing.T) {
 func TestCreateHostedTransaction(t *testing.T) {
 	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")
-	templateKey := os.Getenv("BERBIX_DEMO_TEST_TEMPLATE_KEY")
+	templateKey := os.Getenv("BERBIX_DEMO_TEMPLATE_KEY")
 
 	client := NewClient(secret, &ClientOptions{
 		Host: host,

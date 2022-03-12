@@ -54,11 +54,13 @@ func requestExpecting2XX(c HTTPClient, method string, url string, headers map[st
 		return err
 	}
 	defer func() {
-		err = res.Body.Close()
+		if err == nil {
+			err = res.Body.Close()
+		}
 	}()
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("non-2XX response from Berbix backend %d", res.StatusCode)
+		return getOrMakeGenericErrorResponse(res.Body, res.StatusCode)
 	}
 
 	if res.StatusCode != http.StatusNoContent {

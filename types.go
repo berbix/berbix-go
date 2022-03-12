@@ -279,17 +279,12 @@ type PayloadTooLargeErr struct {
 	errorMessage
 }
 
-type GenericErr struct {
-	StatusCode int
-	Message    string
-}
-
-func (g GenericErr) Error() string {
-	return g.Message
-}
-
 type GenericErrorResponse struct {
 	StatusCode int    `json:"code"`
 	Readable   string `json:"readable,omitempty"`
 	Message    string `json:"message"`
+}
+
+func (g *GenericErrorResponse) Error() string {
+	return fmt.Sprintf("Got response code %d with message %q", g.StatusCode, g.Message)
 }

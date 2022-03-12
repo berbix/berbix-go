@@ -218,9 +218,18 @@ func (c *defaultClient) UploadImages(tokens *Tokens, options *UploadImagesOption
 		msgErr := makeErrorMessage(bodyDec, defaultMsg)
 		return nil, PayloadTooLargeErr{errorMessage: msgErr}
 	default:
-		return nil, GenericErr{
-			StatusCode: httpResp.StatusCode,
-			Message:    fmt.Sprintf("got unexpected response code %d", httpResp.StatusCode),
+		return nil, getOrMakeGenericErrorResponse(httpResp.Body, httpResp.StatusCode)
+	}
+}
+
+func getOrMakeGenericErrorResponse(body io.Reader, statusCode int) *GenericErrorResponse {
+	genErr := &GenericErrorResponse{}
+	if err := json.NewDecoder(body).Decode(&genErr); err == nil {
+		return genErr
+	} else {
+		return &GenericErrorResponse{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("unexpected response code %d", statusCode),
 		}
 	}
 }
