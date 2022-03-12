@@ -31,7 +31,7 @@ func TestCreateTransaction(t *testing.T) {
 func TestCreateHostedTransaction(t *testing.T) {
 	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")
-	templateKey := os.Getenv("BERBIX_DEMO_TEMPLATE_KEY")
+	templateKey := os.Getenv("BERBIX_DEMO_TEST_TEMPLATE_KEY")
 
 	client := NewClient(secret, &ClientOptions{
 		Host: host,
@@ -56,7 +56,7 @@ func TestCreateHostedTransaction(t *testing.T) {
 }
 
 func TestCreateAPIOnlyTransaction(t *testing.T) {
-	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
+	secret := os.Getenv("BERBIX_DEMO_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")
 	templateKey := os.Getenv("BERBIX_DEMO_API_ONLY_TEMPLATE_KEY")
 	// for simplicity, hardcode assumptions
@@ -114,6 +114,7 @@ func TestCreateAPIOnlyTransaction(t *testing.T) {
 	if upRes.NextStep != expectedNextStep {
 		t.Errorf("expected next step of %q but got %q", expectedNextStep, upRes.NextStep)
 	}
+	t.Log("front upload completed")
 
 	opts = &UploadImagesOptions{
 		Images: []RawImage{
@@ -183,11 +184,10 @@ func TestOverrideAPIOnlyTransaction(t *testing.T) {
 			},
 		},
 	}
-	upRes, err := client.UploadImages(&createRes.Tokens, opts)
+	_, err = client.UploadImages(&createRes.Tokens, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("upRes: %+v", upRes)
 	const deleteTransaction = false
 	assertTransaction(t, client, &createRes.Tokens, deleteTransaction)
 }
@@ -251,7 +251,7 @@ func assertCustomerUIDFromAPI(t *testing.T, client Client, tokens *Tokens) *Tran
 }
 
 func TestUploadOversizedImageAPIOnly(t *testing.T) {
-	secret := os.Getenv("BERBIX_DEMO_TEST_CLIENT_SECRET")
+	secret := os.Getenv("BERBIX_DEMO_CLIENT_SECRET")
 	host := os.Getenv("BERBIX_DEMO_API_HOST")
 	templateKey := os.Getenv("BERBIX_DEMO_API_ONLY_TEMPLATE_KEY")
 

@@ -119,14 +119,14 @@ func (c *defaultClient) FetchTransaction(tokens *Tokens) (*TransactionMetadata, 
 		return nil, errors.New("tokens cannot be nil")
 	}
 	metadata := &TransactionMetadata{}
-	return metadata, c.tokenAuthRequestExpecting2XX(http.MethodGet, tokens, v0Transactions, nil, metadata)
+	return metadata, c.tokenAuthRequestExpecting2XX(http.MethodGet, tokens, tokenTypeAccess, v0Transactions, nil, metadata)
 }
 
 func (c *defaultClient) DeleteTransaction(tokens *Tokens) error {
 	if tokens == nil {
 		return errors.New("tokens cannot be nil")
 	}
-	return c.tokenAuthRequestExpecting2XX(http.MethodDelete, tokens, v0Transactions, nil, nil)
+	return c.tokenAuthRequestExpecting2XX(http.MethodDelete, tokens, tokenTypeAccess, v0Transactions, nil, nil)
 }
 
 func (c *defaultClient) UpdateTransaction(tokens *Tokens, options *UpdateTransactionOptions) (*TransactionMetadata, error) {
@@ -139,11 +139,11 @@ func (c *defaultClient) UpdateTransaction(tokens *Tokens, options *UpdateTransac
 	}
 
 	metadata := &TransactionMetadata{}
-	return metadata, c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, v0Transactions, options, metadata)
+	return metadata, c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, tokenTypeAccess, v0Transactions, options, metadata)
 }
 
 func (c *defaultClient) OverrideTransaction(tokens *Tokens, options *OverrideTransactionOptions) error {
-	return c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, "/v0/transactions/override", options, nil)
+	return c.tokenAuthRequestExpecting2XX(http.MethodPatch, tokens, tokenTypeAccess, "/v0/transactions/override", options, nil)
 }
 
 type RawImage struct {
@@ -185,20 +185,19 @@ func (c *defaultClient) UploadImages(tokens *Tokens, options *UploadImagesOption
 		Images: imageDatas,
 	}
 
-	httpResp, err := c.tokenAuthRequest(http.MethodPost, tokens, "/v0/images/upload", req)
+	httpResp, err := c.tokenAuthRequest(http.MethodPost, tokens, tokenTypeClient, "/v0/images/upload", req)
 	if err != nil {
 		return nil, err
 	}
 	defer httpResp.Body.Close()
 	bodyDec := json.NewDecoder(httpResp.Body)
 	switch httpResp.StatusCode {
-	case http.StatusOK, http.StatusUnprocessableEntity:
+	case http.StatusOK:
 		imageResp := ImageUploadResponse{}
 		if err := bodyDec.Decode(&imageResp); err != nil {
 			return nil, fmt.Errorf("error unmarshalling response: %v", err)
 		}
 		return &ImageUploadResult{
-			IsAcceptableIDType:  httpResp.StatusCode != http.StatusUnprocessableEntity,
 			ImageUploadResponse: imageResp,
 		}, nil
 	case http.StatusConflict:
@@ -263,16 +262,23 @@ func (c *defaultClient) ValidateSignature(secret, body, header string) error {
 	return nil
 }
 
-func (c *defaultClient) tokenAuthRequestExpecting2XX(method string, tokens *Tokens, path string, payload interface{}, dst interface{}) error {
-	body, headers, err := c.prepTokenAuthRequest(tokens, payload)
+type tokenType int
+
+const (
+	tokenTypeAccess = iota
+	tokenTypeClient
+)
+
+func (c *defaultClient) tokenAuthRequestExpecting2XX(method string, tokens *Tokens, tokenType tokenType, path string, payload interface{}, dst interface{}) error {
+	body, headers, err := c.prepTokenAuthRequest(tokens, tokenType, payload)
 	if err != nil {
 		return err
 	}
 	return requestExpecting2XX(c.client, method, c.makeURL(path), headers, &RequestOptions{Body: body}, dst)
 }
 
-func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path string, payload interface{}) (*HTTPResponse, error) {
-	body, headers, err := c.prepTokenAuthRequest(tokens, payload)
+func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, tokenType tokenType, path string, payload interface{}) (*HTTPResponse, error) {
+	body, headers, err := c.prepTokenAuthRequest(tokens, tokenType, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +286,7 @@ func (c *defaultClient) tokenAuthRequest(method string, tokens *Tokens, path str
 	return c.client.Request(method, c.makeURL(path), headers, &RequestOptions{Body: body})
 }
 
-func (c *defaultClient) prepTokenAuthRequest(tokens *Tokens, payload interface{},
+func (c *defaultClient) prepTokenAuthRequest(tokens *Tokens, tokenType tokenType, payload interface{},
 ) (reqBody io.Reader, reqHeaders map[string]string, err error) {
 	if tokens.NeedsRefresh() {
 		tokens, err = c.RefreshTokens(tokens)
@@ -296,10 +302,18 @@ func (c *defaultClient) prepTokenAuthRequest(tokens *Tokens, payload interface{}
 		}
 		body = bytes.NewReader(data)
 	}
+
+	var token string
+	switch tokenType {
+	case tokenTypeClient:
+		token = tokens.ClientToken
+	default:
+		token = tokens.AccessToken
+	}
 	headers := map[string]string{
 		"Content-Type":  "application/json",
 		"User-Agent":    fmt.Sprintf("BerbixGo/%s", sdkVersion),
-		"Authorization": fmt.Sprintf("Bearer %s", tokens.AccessToken),
+		"Authorization": fmt.Sprintf("Bearer %s", token),
 	}
 	return body, headers, nil
 }

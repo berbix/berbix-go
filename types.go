@@ -174,6 +174,10 @@ type (
 const (
 	ImageSubjectDocumentFront ImageSubject = "document_front"
 	ImageSubjectDocumentBack  ImageSubject = "document_back"
+	ImageSubjectBarcode       ImageSubject = "document_barcode"
+	ImageSubjectSelfieFront   ImageSubject = "selfie_front"
+	ImageSubjectSelfieLeft    ImageSubject = "selfie_left"
+	ImageSubjectSelfieRight   ImageSubject = "selfie_right"
 
 	ImageFormatPNG  ImageFormat = "image/png"
 	ImageFormatJPEG ImageFormat = "image/jpeg"
@@ -194,24 +198,48 @@ type ImageUploadRequest struct {
 type NextStep string
 
 type ImageUploadResponse struct {
-	PreviewFlags []string `json:"preview_flags"`
-	NextStep     NextStep `json:"next_step"`
+	UploadFeedback *UploadFeedback `json:"upload_feedback"`
+	NextStep       NextStep        `json:"next_step"`
+}
+
+type UploadFeedback struct {
+	// Catch-all property to make it easy to check if there was a problem with the uploaded image in a forward-compatible, way even as new properties are added to the `upload_feedback` object.
+	BadUpload bool `json:"bad_upload"`
+
+	// If present, indicates that the text on the uploaded ID was unreadable.
+	TextUnreadable *struct{} `json:"text_unreadable"`
+
+	// If present, indicates that no face was detected in the image of an ID that we expect to have a portrait.
+	NoFaceOnIDDetected *struct{} `json:"no_face_on_id_detected"`
+
+	// If present, indicates that we were not able to detect a complete barcode in the upload, potentially due to part of the barcode being out of frame.
+	IncompleteBarcodeDetected *struct{} `json:"incomplete_barcode_detected"`
+
+	// If present, indicates than an unsupported ID type, such as a military ID or the visa page of a passport, was uploaded.
+	UnsupportedIDType *UnsupportedIDTypeFeedback `json:"unsupported_id_type"`
+
+	// Catch-all error indicating that there was an issue validating the provided selfie image, potentially because the image is not of someone's face.
+	BadSelfie *struct{} `json:"bad_selfie"`
+}
+
+type UnsupportedIDTypeFeedback struct {
+	// Indicates that the visa page of a passport was uploaded, rather than the ID page.
+	VisaPageOfPassport *bool `json:"visa_page_of_passport,omitempty"`
 }
 
 const (
-	NextStepUploadDocumentFront NextStep = "upload_document_front"
-	NextStepUploadDocumentBack  NextStep = "upload_document_back"
+	NextStepUploadDocumentFront  NextStep = "upload_document_front"
+	NextStepUploadDocumentBack   NextStep = "upload_document_back"
+	NextStepUploadSelfieBasic    NextStep = "upload_selfie_basic"
+	NextStepUploadSelfieLiveness NextStep = "upload_selfie_liveness"
 	// NextStepDone indicates that no more uploads are expected.
 	NextStepDone NextStep = "done"
 )
 
 type ImageUploadResult struct {
-	// IsAcceptableIDType indicates whether this is an ID type that Berbix can accept.
-	// This will be set to false for ID types we can't accept, such as military IDs.
-	IsAcceptableIDType bool
 	// The NextStep of ImageUploadResponse should be inspected to determine the next step the
 	// API expects, e.g. uploading another image.
-	// Similarly, the PreviewFlags will indicate legibility issues or other information that
+	// Similarly, the UploadFeedback will indicate legibility issues or other information that
 	// could immediately be determined from the upload.
 	ImageUploadResponse
 }
