@@ -149,19 +149,23 @@ Upload an image for an API-only transaction.
 The `tokens` and `options` properties are required.
 
 We recommend reading the [API-Only Integration Guide](https://docs.berbix.com/docs/api-only-integration-guide) to
-understand how to set up an API-only integration. At a high level, images of various subjects should be uploaded in an order dictated by the API,
-where the `NextStep` property in the returned `*ImageUploadResult` describes which image should be uploaded next, or that no more images are expected (as indicated by `NextStepDone`).
-The `UploadFeedback` property of `*ImageUploadResult` specified feedback on the image, such as whether the text was readable.
-This can be useful for coaching  end users on how to re-take an image if the `NextStep` indicates another image of the same subject should be uploaded.
-See the [description of `UploadFeedback`](#uploadfeedback) below for more details.
+understand how to set up an API-only integration. At a high level, images of various subjects should be uploaded in an
+order dictated by the API, where the `NextStep` property in the returned `*ImageUploadResult` describes which image
+should be uploaded next, or that no more images are expected (as indicated by `NextStepDone`).
 
-See the [documentation for the corresponding API endpoint](https://docs.berbix.com/reference/uploadimages) for a
-description of what images are expected in what situations and how to interpret the results of the response.
+The `Issues` property of `ImageUploadResult` specifies feedback on the image, such as whether the text was readable.
+This can be useful for coaching end users on how to re-take an image if the `NextStep` indicates another image of the
+same subject should be uploaded. See the descriptions of the [`Issue` property](#issues-issue) and the
+[`IssueDetails` type](#issuedetails-issuedetails) below for more details.
 
 The `Images` property of the `options` must contain at least one image, but more images may be required depending on which step in the verification process you have reached.
 Refer to the [API documentation](https://docs.berbix.com/reference/uploadimages) for an up-to-date description of what and how many images are expected at each step.
 
 See the [documentation of the `RawImage` type](#rawimage) below for more details on the values that should be passed in the `Images` slice.
+See the [documentation for the corresponding API endpoint](https://docs.berbix.com/reference/uploadimages) for a
+description of what images are expected in what situations and how to interpret the results of the response.
+
+
 
 ### `Tokens`
 
@@ -200,12 +204,17 @@ An updated list of supported formats is maintained in the [integration guide](ht
 
 Value representing the subject of the image, such as the front of an ID document. The following `ImageSubject` constants
 are provided as a convenience:
-- `ImageSubjectDocumentFront`
-- `ImageSubjectDocumentBack` 
-- `ImageSubjectBarcode`      
-- `ImageSubjectSelfieFront`
-- `ImageSubjectSelfieLeft`
-- `ImageSubjectSelfieRight`
+```go
+const (
+	ImageSubjectDocumentFront ImageSubject = "document_front"
+	ImageSubjectDocumentBack  ImageSubject = "document_back"
+	ImageSubjectBarcode       ImageSubject = "document_barcode"
+	ImageSubjectSelfieFront   ImageSubject = "selfie_front"
+	ImageSubjectSelfieLeft    ImageSubject = "selfie_left"
+	ImageSubjectSelfieRight   ImageSubject = "selfie_right"
+)
+```
+
 
 ##### `ImageFormage: ImageFormat`
 
@@ -213,37 +222,60 @@ A value representing the format of an image. The following constants of type `Im
 - `ImageFormatJPEG`
 - `ImageFormatPNG`
 
-### `UploadFeedback`
-
-The `UploadFeedback` struct users points to empty structs for many of its fields, as the API may add properties to the
-returned JSON objects corresponding to each of those properties over time.
+### `ImageUploadResult`
 
 #### Properties
 
-##### `BadUpload: bool`
+##### `NextStep: NextStep`
 
-Catch-all property to make it easy to check if there was a problem with the uploaded image in a forward-compatible, way even as new properties are added to the `UploadFeedback` struct.
+Describes the next expected interaction with the SDK. The following constants for `NextStep` values are exposed.
+```go
+const (
+	NextStepUploadDocumentFront  NextStep = "upload_document_front"
+	NextStepUploadDocumentBack   NextStep = "upload_document_back"
+	NextStepUploadSelfieBasic    NextStep = "upload_selfie_basic"
+	NextStepUploadSelfieLiveness NextStep = "upload_selfie_liveness"
+	NextStepDone NextStep = "done"
+)
+```
 
-##### `TextUnreadable: *struct{}`
+The `NextStepUpload*` values indicate that the next expected interaction with the API is to upload more images,
+while `NextStepDone` indicates no more uploads are required or expected.
 
-If present, indicates that the text on the uploaded ID was unreadable.
+##### `Issues: []Issue`
 
-##### `NoFaceOnIDDetected: *struct{}`
+A slice of values describing the issues, if any, with the upload.
+This SDK has constants for the following values which may appear in `Issues`:
 
-If present, indicates that no face was detected in the image of an ID that we expect to have a portrait.
+```go
+const (
+	IssueBadUpload                 Issue = "bad_upload"
+	IssueTextUnreadable            Issue = "text_unreadable"
+	IssueNoFaceOnIDDetected        Issue = "no_face_on_id_detected"
+	IssueIncompleteBarcodeDetected Issue = "incomplete_barcode_detected"
+	IssueUnsupportedIDType         Issue = "unsupported_id_type"
+	IssueBadSelfie                 Issue = "bad_selfie"
+)
+```
 
-##### `IncompleteBarcodeDetected: *struct{}`
+`IssueBadUpload` is a catch-all value that is used when the issue with the image doesn't fall into other
+  categories and/or Berbix is obfuscating the problem with the image as it may relate to fraud.
 
-If present, indicates that we were not able to detect a complete barcode in the upload, potentially due to part of the barcode being out of frame.
+`IssueIncompleteBarcodeDetected` can indicate that an incomplete barcode was in the uploaded image, or that the
+  barcode was entirely missing.
+
+
+##### `IssueDetails: IssueDetails`
+
+Additional details related to the issues identified by `Issues`. See [`IssueDetails` below](#issuedetails).
+
+### `IssueDetails`
 
 ##### `UnsupportedIDType: *UnsupportedIDTypeFeedback`
 
-If present, indicates than an unsupported ID type, such as a military ID or the visa page of a passport, was uploaded.
-The `VisaPageOfPassport` property will be set to `true` if it appears as if the visa page of a passport was uploaded, rather than the photo ID page.
-
-##### `BadSelfie: *struct{}`
-
-Catch-all error indicating that there was an issue validating the provided selfie image, potentially because the image is not of someone's face.
+This property may be set to a non-`nil` value of the `IssueUnsupportedIDType` value is present in the `Issues` slice
+in `ImageUplaodResult`. The `VisaPageOfPassport` property of `UnsupportedIDTypeFeedback` will be set to `true` if it
+appears as if the visa page of a passport was uploaded, rather than the photo ID page.
 
 #### Static methods
 

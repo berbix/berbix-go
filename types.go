@@ -195,37 +195,29 @@ type ImageUploadRequest struct {
 	Images []ImageData `json:"images"`
 }
 
-type NextStep string
-
 type ImageUploadResponse struct {
-	UploadFeedback *UploadFeedback `json:"upload_feedback"`
-	NextStep       NextStep        `json:"next_step"`
+	// Holds a list of values representing issues with the uploaded image.
+	Issues []Issue `json:"issues"`
+
+	// Details on issues surfaced in the Issues list.
+	// Not all issues have corresponding details.
+	IssueDetails IssueDetails `json:"issue_details"`
+
+	// The next step to take given the current state.
+	NextStep NextStep `json:"next_step"`
 }
 
-type UploadFeedback struct {
-	// Catch-all property to make it easy to check if there was a problem with the uploaded image in a forward-compatible, way even as new properties are added to the `upload_feedback` object.
-	BadUpload bool `json:"bad_upload"`
-
-	// If present, indicates that the text on the uploaded ID was unreadable.
-	TextUnreadable *struct{} `json:"text_unreadable"`
-
-	// If present, indicates that no face was detected in the image of an ID that we expect to have a portrait.
-	NoFaceOnIDDetected *struct{} `json:"no_face_on_id_detected"`
-
-	// If present, indicates that we were not able to detect a complete barcode in the upload, potentially due to part of the barcode being out of frame.
-	IncompleteBarcodeDetected *struct{} `json:"incomplete_barcode_detected"`
-
-	// If present, indicates than an unsupported ID type, such as a military ID or the visa page of a passport, was uploaded.
-	UnsupportedIDType *UnsupportedIDTypeFeedback `json:"unsupported_id_type"`
-
-	// Catch-all error indicating that there was an issue validating the provided selfie image, potentially because the image is not of someone's face.
-	BadSelfie *struct{} `json:"bad_selfie"`
+type IssueDetails struct {
+	// Provides information on why we could not accept the photo of the ID.
+	UnsupportedIDType *UnsupportedIDTypeDetails `json:"unsupported_id_type"`
 }
 
-type UnsupportedIDTypeFeedback struct {
+type UnsupportedIDTypeDetails struct {
 	// Indicates that the visa page of a passport was uploaded, rather than the ID page.
-	VisaPageOfPassport *bool `json:"visa_page_of_passport,omitempty"`
+	VisaPageOfPassport *bool `json:"visa_page_of_passport"`
 }
+
+type NextStep string
 
 const (
 	NextStepUploadDocumentFront  NextStep = "upload_document_front"
@@ -234,6 +226,17 @@ const (
 	NextStepUploadSelfieLiveness NextStep = "upload_selfie_liveness"
 	// NextStepDone indicates that no more uploads are expected.
 	NextStepDone NextStep = "done"
+)
+
+type Issue string
+
+const (
+	IssueBadUpload                 Issue = "bad_upload"
+	IssueTextUnreadable            Issue = "text_unreadable"
+	IssueNoFaceOnIDDetected        Issue = "no_face_on_id_detected"
+	IssueIncompleteBarcodeDetected Issue = "incomplete_barcode_detected"
+	IssueUnsupportedIDType         Issue = "unsupported_id_type"
+	IssueBadSelfie                 Issue = "bad_selfie"
 )
 
 type ImageUploadResult struct {
