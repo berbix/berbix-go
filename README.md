@@ -150,7 +150,7 @@ The `tokens` and `options` properties are required.
 
 We recommend reading the [API-Only Integration Guide](https://docs.berbix.com/docs/api-only-integration-guide) to
 understand how to set up an API-only integration. At a high level, images of various subjects should be uploaded in an
-order dictated by the API, where the `NextStep` property in the returned `*ImageUploadResult` describes which image
+order dictated by the API, where the `NextStep` property in the returned `ImageUploadResult` describes which image
 should be uploaded next, or that no more images are expected (as indicated by `NextStepDone`).
 
 The `Issues` property of `ImageUploadResult` specifies feedback on the image, such as whether the text was readable.
@@ -158,12 +158,12 @@ This can be useful for coaching end users on how to re-take an image if the `Nex
 same subject should be uploaded. See the descriptions of the [`Issue` property](#issues-issue) and the
 [`IssueDetails` type](#issuedetails-issuedetails) below for more details.
 
-The `Images` property of the `options` must contain at least one image, but more images may be required depending on which step in the verification process you have reached.
-Refer to the [API documentation](https://docs.berbix.com/reference/uploadimages) for an up-to-date description of what and how many images are expected at each step.
+The `Images` property of the `options` must contain at least one image, but more images may be required depending on
+which step in the verification process you have reached. Refer to
+the [API documentation](https://docs.berbix.com/reference/uploadimages) for an up-to-date description of what and how
+many images are expected at each step and what the first image uploaded should be.
 
 See the [documentation of the `RawImage` type](#rawimage) below for more details on the values that should be passed in the `Images` slice.
-See the [documentation for the corresponding API endpoint](https://docs.berbix.com/reference/uploadimages) for a
-description of what images are expected in what situations and how to interpret the results of the response.
 
 
 
