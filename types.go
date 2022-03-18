@@ -196,12 +196,29 @@ type ImageUploadRequest struct {
 	Images []ImageData `json:"images"`
 }
 
-type NextStep string
-
 type ImageUploadResponse struct {
-	PreviewFlags []string `json:"preview_flags"`
-	NextStep     NextStep `json:"next_step"`
+	// Holds a list of values representing issues with the uploaded image.
+	Issues []Issue `json:"issues"`
+
+	// Details on issues surfaced in the Issues list.
+	// Not all issues have corresponding details.
+	IssueDetails IssueDetails `json:"issue_details"`
+
+	// The next step to take given the current state.
+	NextStep NextStep `json:"next_step"`
 }
+
+type IssueDetails struct {
+	// Provides information on why we could not accept the photo of the ID.
+	UnsupportedIDType *UnsupportedIDTypeDetails `json:"unsupported_id_type"`
+}
+
+type UnsupportedIDTypeDetails struct {
+	// Indicates that the visa page of a passport was uploaded, rather than the ID page.
+	VisaPageOfPassport *bool `json:"visa_page_of_passport"`
+}
+
+type NextStep string
 
 const (
 	NextStepUploadDocumentFront  NextStep = "upload_document_front"
@@ -212,13 +229,21 @@ const (
 	NextStepDone NextStep = "done"
 )
 
+type Issue string
+
+const (
+	IssueBadUpload                 Issue = "bad_upload"
+	IssueTextUnreadable            Issue = "text_unreadable"
+	IssueNoFaceOnIDDetected        Issue = "no_face_on_id_detected"
+	IssueIncompleteBarcodeDetected Issue = "incomplete_barcode_detected"
+	IssueUnsupportedIDType         Issue = "unsupported_id_type"
+	IssueBadSelfie                 Issue = "bad_selfie"
+)
+
 type ImageUploadResult struct {
-	// IsAcceptableIDType indicates whether this is an ID type that Berbix can accept.
-	// This will be set to false for ID types we can't accept, such as military IDs.
-	IsAcceptableIDType bool
 	// The NextStep of ImageUploadResponse should be inspected to determine the next step the
 	// API expects, e.g. uploading another image.
-	// Similarly, the PreviewFlags will indicate legibility issues or other information that
+	// Similarly, the Issues and IssueDetails will indicate legibility issues or other information that
 	// could immediately be determined from the upload.
 	ImageUploadResponse
 }
@@ -258,17 +283,12 @@ type PayloadTooLargeErr struct {
 	errorMessage
 }
 
-type GenericErr struct {
-	StatusCode int
-	Message    string
-}
-
-func (g GenericErr) Error() string {
-	return g.Message
-}
-
 type GenericErrorResponse struct {
 	StatusCode int    `json:"code"`
 	Readable   string `json:"readable,omitempty"`
 	Message    string `json:"message"`
+}
+
+func (g *GenericErrorResponse) Error() string {
+	return fmt.Sprintf("Got response code %d with message %q", g.StatusCode, g.Message)
 }
